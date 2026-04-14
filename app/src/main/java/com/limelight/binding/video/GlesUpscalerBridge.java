@@ -193,6 +193,8 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
         fboTextureId = textures[1];
 
         // Configure OES Texture
+        // Changé de GL_LINEAR à GL_NEAREST à votre demande. Idéal pour conserver la valeur exacte 
+        // des pixels bruts lors du transfert (blit) de la texture OES vers le FBO de même taille.
         GLES31.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId);
         GLES31.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_MIN_FILTER, GLES31.GL_NEAREST);
         GLES31.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_MAG_FILTER, GLES31.GL_NEAREST);
@@ -200,6 +202,8 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
         GLES31.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES31.GL_TEXTURE_WRAP_T, GLES31.GL_CLAMP_TO_EDGE);
 
         // Configure 2D Texture (FBO)
+        // ATTENTION: Celle-ci doit rester en GL_LINEAR car le shader d'upscale (Pass 2) s'appuie 
+        // sur l'interpolation bilinéaire matérielle pour l'upscale natif des UV (chroma) et le SGSR.
         GLES31.glBindTexture(GLES31.GL_TEXTURE_2D, fboTextureId);
         GLES31.glTexImage2D(GLES31.GL_TEXTURE_2D, 0, GLES31.GL_RGBA, streamWidth, streamHeight, 0, GLES31.GL_RGBA, GLES31.GL_UNSIGNED_BYTE, null);
         GLES31.glTexParameteri(GLES31.GL_TEXTURE_2D, GLES31.GL_TEXTURE_MIN_FILTER, GLES31.GL_LINEAR);
@@ -224,6 +228,11 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
         surfaceTexture.setOnFrameAvailableListener(this);
         decoderSurface = new Surface(surfaceTexture);
         
+        // IMPORTANT: Libérer le contexte EGL de ce thread d'initialisation.
+        // Si on ne le fait pas, renderFrame() plantera avec "EGL_BAD_ACCESS" (error 3002) 
+        // car il essayera d'utiliser ce contexte sur un autre thread (le thread de rendu).
+        EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
+
         LimeLog.info(TAG + ": GlesUpscalerBridge initialized: Stream=" + streamWidth + "x" + streamHeight + " Display=" + displayWidth + "x" + displayHeight);
     }
 
@@ -272,7 +281,10 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
             frameAvailable = false;
         }
 
-        EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            LimeLog.severe(TAG + ": eglMakeCurrent failed in renderFrame");
+            return;
+        }
         
         surfaceTexture.updateTexImage();
         surfaceTexture.getTransformMatrix(transformMatrix);

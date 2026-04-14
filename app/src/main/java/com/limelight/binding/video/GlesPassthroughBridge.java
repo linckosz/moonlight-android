@@ -300,6 +300,9 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
         surfaceTexture.setOnFrameAvailableListener(this);
         decoderSurface = new Surface(surfaceTexture);
         
+        // IMPORTANT: Unbind context so it can be picked up by the rendering thread!
+        EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
+
         LimeLog.info(TAG + ": GLES 3.1 2-Pass Bridge initialized: Stream=" + streamWidth + "x" + streamHeight + " Display=" + displayWidth + "x" + displayHeight);
     }
 
@@ -382,7 +385,10 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
         }
 
         // Ensure the EGL context is current on the rendering thread
-        EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            LimeLog.severe(TAG + ": eglMakeCurrent failed in renderFrame");
+            return;
+        }
         
         long renderStartTime = System.nanoTime();
 
