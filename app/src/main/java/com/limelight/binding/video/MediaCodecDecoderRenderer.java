@@ -80,7 +80,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     private boolean foreground = true;
     private PerfOverlayListener perfListener;
 
-    private GlesUpscalerBridge glesBridge;
+    private GlesPassthroughBridge glesBridge;
     private float videoSrUpscaleRatio;
 
     private static final int CR_MAX_TRIES = 10;
@@ -543,7 +543,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
         if (prefs.videoSr) {
             // SGSR1 Upscaling -> Now FSR EASU Upscaling
-            glesBridge = new GlesUpscalerBridge(this.context);
+            glesBridge = new GlesPassthroughBridge(this.context);
             glesBridge.initialize(renderTarget.getSurface(), initialWidth, initialHeight);
             Surface decoderSurface = glesBridge.getDecoderSurface();
 

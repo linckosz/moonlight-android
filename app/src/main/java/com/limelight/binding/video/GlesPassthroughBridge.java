@@ -134,15 +134,6 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
     private int streamWidth, streamHeight;
     private int displayWidth, displayHeight;
 
-    // Adaptive Shader Performance Tracking
-    private boolean performanceEvaluationActive = true;
-    private boolean useEdgeDirection = true;
-    private long firstFrameTimeMs = 0;
-    private long totalRenderTimeNanos = 0;
-    private int evaluatedFrameCount = 0;
-    private long totalFrameIntervalNanos = 0;
-    private long lastPresentationTimeNanos = 0;
-
     public GlesPassthroughBridge(Context context) {
         this.context = context;
         
@@ -239,15 +230,6 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
         EGL14.eglQuerySurface(eglDisplay, eglSurface, EGL14.EGL_HEIGHT, queryH, 0);
         this.displayWidth = queryW[0];
         this.displayHeight = queryH[0];
-        
-        // Reset performance evaluation variables
-        performanceEvaluationActive = true;
-        useEdgeDirection = true;
-        firstFrameTimeMs = 0;
-        totalRenderTimeNanos = 0;
-        evaluatedFrameCount = 0;
-        totalFrameIntervalNanos = 0;
-        lastPresentationTimeNanos = 0;
 
         // 1. Setup Blit Program (OES -> 2D Texture)
         blitProgram = createProgram(BLIT_VERTEX_SHADER, BLIT_FRAGMENT_SHADER);
@@ -312,13 +294,7 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
             postProgram = 0;
         }
 
-        String postSource = FALLBACK_POST_FRAGMENT_SHADER;
-        if (useEdgeDirection) {
-            postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
-        } else {
-            postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
-        }
-        // postSource = FALLBACK_POST_FRAGMENT_SHADER;
+        String postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
 
         if (postSource == null || postSource.trim().isEmpty()) {
             LimeLog.warning(TAG + ": sgsr1_shader_mobile_edge_direction.frag is missing or empty. Using fallback shader.");
@@ -391,8 +367,6 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
             return;
         }
         
-        long renderStartTime = System.nanoTime();
-
         // Consume the new frame from the decoder
         surfaceTexture.updateTexImage();
         surfaceTexture.getTransformMatrix(transformMatrix);
@@ -461,43 +435,6 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
         // Present the frame to the display
         EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTimeNanos);
         EGL14.eglSwapBuffers(eglDisplay, eglSurface);
-
-        long renderTimeNanos = System.nanoTime() - renderStartTime;
-
-        if (performanceEvaluationActive) {
-            long currentTimeMs = System.currentTimeMillis();
-            if (firstFrameTimeMs == 0) {
-                firstFrameTimeMs = currentTimeMs;
-            } else {
-                if (lastPresentationTimeNanos != 0 && presentationTimeNanos > lastPresentationTimeNanos) {
-                    totalFrameIntervalNanos += (presentationTimeNanos - lastPresentationTimeNanos);
-                }
-                totalRenderTimeNanos += renderTimeNanos;
-                evaluatedFrameCount++;
-
-                // Wait 10s before reloading the shader if the render time is high
-                if (currentTimeMs - firstFrameTimeMs > 10000) {
-                    performanceEvaluationActive = false;
-                    if (evaluatedFrameCount > 10) {
-                        long avgRenderTime = totalRenderTimeNanos / evaluatedFrameCount;
-                        long avgFrameInterval = totalFrameIntervalNanos / evaluatedFrameCount;
-                        
-                        if (avgFrameInterval == 0) {
-                            avgFrameInterval = 16666666L; // Default to ~60 FPS
-                        }
-                        
-                        LimeLog.info(TAG + ": Performance eval finished. Avg Render: " + (avgRenderTime / 1000000.0) + "ms, Avg Frame: " + (avgFrameInterval / 1000000.0) + "ms");
-
-                        if (avgRenderTime > avgFrameInterval) {
-                            LimeLog.info(TAG + ": Disabling UseEdgeDirection due to high render time.");
-                            //useEdgeDirection = false;
-                            //setupPostProgram(); // Recompile and switch shader program dynamically
-                        }
-                    }
-                }
-            }
-            lastPresentationTimeNanos = presentationTimeNanos;
-        }
     }
 
     /**
