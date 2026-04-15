@@ -316,8 +316,9 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
         if (useEdgeDirection) {
             postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
         } else {
-            postSource = loadAsset("sgsr1_shader_mobile.frag");
+            postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
         }
+        // postSource = FALLBACK_POST_FRAGMENT_SHADER;
 
         if (postSource == null || postSource.trim().isEmpty()) {
             LimeLog.warning(TAG + ": sgsr1_shader_mobile_edge_direction.frag is missing or empty. Using fallback shader.");
@@ -489,8 +490,8 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
 
                         if (avgRenderTime > avgFrameInterval) {
                             LimeLog.info(TAG + ": Disabling UseEdgeDirection due to high render time.");
-                            useEdgeDirection = false;
-                            setupPostProgram(); // Recompile and switch shader program dynamically
+                            //useEdgeDirection = false;
+                            //setupPostProgram(); // Recompile and switch shader program dynamically
                         }
                     }
                 }
