@@ -542,7 +542,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         LimeLog.info("Configuring with format: "+format);
 
         if (prefs.videoSr) {
-            // SGSR1 Upscaling -> Now FSR EASU Upscaling
+            // SGSR1 Upscaling
             glesBridge = new GlesPassthroughBridge(this.context);
             glesBridge.initialize(renderTarget.getSurface(), initialWidth, initialHeight);
             Surface decoderSurface = glesBridge.getDecoderSurface();

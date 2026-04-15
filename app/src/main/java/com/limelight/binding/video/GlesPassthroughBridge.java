@@ -294,11 +294,10 @@ public class GlesPassthroughBridge implements SurfaceTexture.OnFrameAvailableLis
             postProgram = 0;
         }
 
-        // Load the new fast upscaler shader
-        String postSource = loadAsset("upscaler.frag");
+        String postSource = loadAsset("sgsr1_shader_mobile_edge_direction.frag");
 
         if (postSource == null || postSource.trim().isEmpty()) {
-            LimeLog.warning(TAG + ": upscaler.frag is missing or empty. Using fallback shader.");
+            LimeLog.warning(TAG + ": sgsr1_shader_mobile_edge_direction.frag is missing or empty. Using fallback shader.");
             postSource = FALLBACK_POST_FRAGMENT_SHADER;
         }
         
