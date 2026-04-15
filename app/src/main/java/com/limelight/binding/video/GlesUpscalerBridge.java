@@ -22,7 +22,7 @@ import java.io.InputStreamReader;
 
 /**
  * Cette classe agit comme un pont pour l'upscaling vidéo YUV natif.
- * Elle utilise un pipeline OpenGL ES 3.1 simplifié avec un shader d'upscaling YUV spécifique.
+ * Elle utilise un pipeline OpenGL ES 3.1 simplifié avec un shader d'upscaling FSR EASU.
  */
 public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "GlesUpscalerBridge";
@@ -57,10 +57,10 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
             "#version 310 es\n" +
             "in vec4 aPosition;\n" +
             "in vec4 aTexCoord;\n" +
-            "out vec4 in_TEXCOORD0;\n" +
+            "out vec2 v_texCoord;\n" +
             "void main() {\n" +
             "  gl_Position = aPosition;\n" +
-            "  in_TEXCOORD0 = aTexCoord;\n" +
+            "  v_texCoord = aTexCoord.xy;\n" +
             "}\n";
 
     private final Context context;
@@ -94,6 +94,8 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
     private int post_aPositionHandle;
     private int post_aTexCoordHandle;
     private int post_sTextureHandle;
+    private int post_uSourceSizeHandle;
+    private int post_uOutputSizeHandle;
     
     // Full-screen quad vertices
     private static final float[] VERTICES = {
@@ -237,22 +239,19 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
     }
 
     private void setupPostProgram() {
-        // Charge le shader YUV optimisé de façon stricte (pas de fallback, pas de rechargement)
-        String postSource = loadAsset("sgsr1_shader_mobile_yuv_edge_direction.frag");
+        String postSource = loadAsset("fsr_easu.frag");
         
         if (postSource == null || postSource.trim().isEmpty()) {
-            LimeLog.severe(TAG + ": Impossible de charger sgsr1_shader_mobile_yuv_edge_direction.frag");
+            LimeLog.severe(TAG + ": Impossible de charger fsr_easu.frag");
             return;
         }
 
-        // Remplace les #define codés en dur par la vraie résolution d'entrée streamWidth/streamHeight
-        postSource = postSource.replace("1280.0", streamWidth + ".0");
-        postSource = postSource.replace("720.0", streamHeight + ".0");
-        
         postProgram = createProgram(POST_VERTEX_SHADER, postSource);
         post_aPositionHandle = GLES31.glGetAttribLocation(postProgram, "aPosition");
         post_aTexCoordHandle = GLES31.glGetAttribLocation(postProgram, "aTexCoord");
-        post_sTextureHandle = GLES31.glGetUniformLocation(postProgram, "ps0"); // Doit correspondre à sampler2D ps0;
+        post_sTextureHandle = GLES31.glGetUniformLocation(postProgram, "u_source");
+        post_uSourceSizeHandle = GLES31.glGetUniformLocation(postProgram, "u_sourceSize");
+        post_uOutputSizeHandle = GLES31.glGetUniformLocation(postProgram, "u_outputSize");
     }
 
     public Surface getDecoderSurface() {
@@ -305,7 +304,7 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
         
         drawQuad(blit_aPositionHandle, blit_aTexCoordHandle);
 
-        // PASS 2: Shader d'upscaling YUV vers l'écran
+        // PASS 2: Shader d'upscaling FSR EASU vers l'écran
         GLES31.glBindFramebuffer(GLES31.GL_FRAMEBUFFER, 0);
         GLES31.glViewport(0, 0, displayWidth, displayHeight);
         GLES31.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -314,6 +313,8 @@ public class GlesUpscalerBridge implements SurfaceTexture.OnFrameAvailableListen
         GLES31.glUseProgram(postProgram);
 
         if (post_sTextureHandle >= 0) GLES31.glUniform1i(post_sTextureHandle, 0);
+        if (post_uSourceSizeHandle >= 0) GLES31.glUniform2f(post_uSourceSizeHandle, (float)streamWidth, (float)streamHeight);
+        if (post_uOutputSizeHandle >= 0) GLES31.glUniform2f(post_uOutputSizeHandle, (float)displayWidth, (float)displayHeight);
 
         GLES31.glActiveTexture(GLES31.GL_TEXTURE0);
         GLES31.glBindTexture(GLES31.GL_TEXTURE_2D, fboTextureId);

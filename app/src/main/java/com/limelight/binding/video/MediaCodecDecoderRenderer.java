@@ -80,7 +80,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     private boolean foreground = true;
     private PerfOverlayListener perfListener;
 
-    private GlesPassthroughBridge glesBridge;
+    private GlesUpscalerBridge glesBridge;
     private float videoSrUpscaleRatio;
 
     private static final int CR_MAX_TRIES = 10;
@@ -542,8 +542,8 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         LimeLog.info("Configuring with format: "+format);
 
         if (prefs.videoSr) {
-            // SGSR1 Upscaling
-            glesBridge = new GlesPassthroughBridge(this.context);
+            // SGSR1 Upscaling -> Now FSR EASU Upscaling
+            glesBridge = new GlesUpscalerBridge(this.context);
             glesBridge.initialize(renderTarget.getSurface(), initialWidth, initialHeight);
             Surface decoderSurface = glesBridge.getDecoderSurface();
 
